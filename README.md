@@ -16,7 +16,6 @@ Scripts to create dynamically adapting Map Layouts in QGIS. Refering to talk "Ar
 
 
 ## Known Limitations
-- Text label height calculation does not consider emtpy lines
-- Text label height calculation get's inaccurate if label has many lines
+- Text label height calculation can get inaccurate if label has many lines
 - Expression evaluation get's lost sometimes. Save QGIS Project, reopen and refresh view. In case that doesn't help rerun the script. However, remember to rename your Layout before to prevent it from being overwritten
 - Legend label autowrap is not implemented as this function was added in QGIS v3.44 while these scripts are written for LTR v3.40

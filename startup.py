@@ -113,14 +113,15 @@ def GetPageSizeHeight(LayoutName):
 
 
 @qgsfunction(args='auto', group='Custom')
-def CalcLabelHeight(layout_name, item_name, feature, parent):
-    layout_name = layout_name
-    item_name = item_name
+def CalcLabelHeight(layout_name, item_name, feature, parent, line_spacing=1.0):
+    """
+    Berechnet die tatsächliche Höhe eines QTextLabel-Items im Layout.
+    line_spacing = Faktor für Zeilenabstand (z. B. 1.15 für 15% mehr Abstand)
+    """
 
-    # Layout abfragen
     manager = QgsProject.instance().layoutManager()
     layout = manager.layoutByName(layout_name)
-    
+
     if not layout:
         return 0
 
@@ -128,37 +129,58 @@ def CalcLabelHeight(layout_name, item_name, feature, parent):
     if not item or not isinstance(item, QgsLayoutItemLabel):
         return 0
 
+    # Text, Font und Breite des Labels
     text = item.text()
     font = item.font()
     width_mm = item.sizeWithUnits().width()
-
     if not text.strip():
         return 0
 
-    font_metrics = QFontMetricsF(font)
-    width_px = width_mm * 96 / 25.4  # mm to pixels @ 96dpi
+    # Umrechnung mm - Pixel (96 dpi)
+    width_px = width_mm * 96 / 25.4
+    metrics = QFontMetricsF(font)
+
     lines = []
-    for paragraph in text.split('\n'):
-        line = ''
-        for word in paragraph.split(' '):
-            test_line = line + ' ' + word if line else word
-            if font_metrics.horizontalAdvance(test_line) > width_px:
-                if line:
-                    lines.append(line)
-                line = word
+
+    # Text in Abschnitte trennen (Absatz = Zeilenumbruch)
+    paragraphs = text.split('\n')
+
+    for para in paragraphs:
+
+        # harte Leerzeile - als echte Zeile zaehlen
+        if para.strip() == "":
+            lines.append(" ")
+            continue
+
+        words = para.split(" ")
+        current_line = ""
+
+        for word in words:
+            test_line = word if current_line == "" else current_line + " " + word
+
+            # boundingRect statt horizontalAdvance
+            if metrics.boundingRect(test_line).width() > width_px:
+                # alte Zeile abschliessen
+                if current_line != "":
+                    lines.append(current_line)
+                current_line = word
             else:
-                line = test_line
-        if line:
-            lines.append(line)
+                current_line = test_line
 
-    total_height_px = sum(font_metrics.boundingRect(line).height() for line in lines)
+        if current_line != "":
+            lines.append(current_line)
 
-    # Add 5% extra height as padding to prevent clipping
+    # Gesamthoehe berechnen
+    total_height_px = 0
+    for line in lines:
+        h = metrics.boundingRect(line).height()
+        total_height_px += h * line_spacing
+
+    # Sicherheitsabstand
     total_height_px *= 1.025
 
-    # Convert px back to mm
+    # zurueck in mm
     height_mm = total_height_px * 25.4 / 96
-
     return height_mm
 
 
