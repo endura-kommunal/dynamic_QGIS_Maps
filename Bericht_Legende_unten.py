@@ -169,8 +169,33 @@ legend_frame.dataDefinedProperties().setProperty(
         "@custom_page_size_width_blu - @custom_frame_width_blu - @custom_frame_line_width_blu"
     ),
 )
-# expr_legend_frame_height = "@custom_page_size_height_blu - @custom_map_height_blu"
-expr_legend_frame_height = "GetDynamicItemHeight(@layout_name, 'metadata_frame') + GetDynamicItemHeight(@layout_name, 'plan_content_frame')"
+
+########################################################################
+### These are expressions for plan_content frame properties.
+### Required at this point for comparing legend_frame height definition.
+########################################################################
+expr_plan_content_frame_height_text = (
+    "to_real(@custom_frame_line_width_blu) +"
+    "to_real(@custom_item_dist_top_blu) + "
+    "GetDynamicItemHeight(@layout_name,'plan_content_title') + "
+    "to_real(@custom_dist_title_text_blu) + "
+    "GetDynamicItemHeight(@layout_name,'plan_content') + "
+    "to_real(@custom_item_dist_bottom_blu)"
+)
+expr_plan_content_frame_height_text_metadata = (
+    f"GetDynamicItemHeight(@layout_name,'metadata_frame') + {expr_plan_content_frame_height_text}"
+)
+########################################################################
+### End of plan_content frame property expressions
+########################################################################
+
+expr_legend_frame_height_text = "to_real(@custom_frame_line_width_blu) + " \
+    "to_real(@custom_item_dist_top_blu) + " \
+    "GetDynamicItemHeight(@layout_name,'legend_title') + "\
+    "to_real(@custom_dist_title_text_blu) + " \
+    "GetDynamicItemHeight(@layout_name,'legend') + "\
+    "to_real(@custom_item_dist_bottom_blu)"
+expr_legend_frame_height = f"if({expr_plan_content_frame_height_text_metadata} > {expr_legend_frame_height_text}, {expr_plan_content_frame_height_text_metadata}, {expr_legend_frame_height_text})"
 legend_frame.dataDefinedProperties().setProperty(
     QgsLayoutObject.ItemHeight, QgsProperty.fromExpression(expr_legend_frame_height)
 )
@@ -292,19 +317,6 @@ legend.dataDefinedProperties().setProperty(
     QgsLayoutObject.ItemWidth, QgsProperty.fromExpression(expr_legend_width)
 )
 
-expr_legend_height = (
-    "GetDynamicItemHeight(@layout_name,'legend_frame') -"
-    "to_real(@custom_item_dist_top_blu) - "
-    "to_real(@custom_frame_line_width_blu) - "
-    "GetDynamicItemHeight(@layout_name,'legend_title') -"
-    "to_real(@custom_dist_title_text_blu) -"
-    "@custom_item_dist_bottom_blu"
-)
-
-legend.dataDefinedProperties().setProperty(
-    QgsLayoutObject.ItemHeight, QgsProperty.fromExpression(expr_legend_height)
-)
-
 # legend.dataDefinedProperties().setProperty(  # erst in V 3.44
 #     QgsLegendSettings.autoWrapLinesAfter,
 #     QgsProperty.fromExpression(expr_legend_width))
@@ -373,14 +385,27 @@ plan_content_frame.dataDefinedProperties().setProperty(
 plan_content_frame.dataDefinedProperties().setProperty(
     QgsLayoutObject.ItemWidth, QgsProperty.fromExpression("@custom_frame_width_blu")
 )
-expr_plan_content_frame_height = (
-    "to_real(@custom_frame_line_width_blu) +"
-    "to_real(@custom_item_dist_top_blu) + "
-    "GetDynamicItemHeight(@layout_name,'plan_content_title') + "
-    "to_real(@custom_dist_title_text_blu) + "
-    "GetDynamicItemHeight(@layout_name,'plan_content') + "
-    "to_real(@custom_item_dist_bottom_blu)"
+
+########################################################################
+### These are expressions for plan_content frame properties.
+### Required at this point for comparing legend_frame height definition.
+########################################################################
+# expr_plan_content_frame_height_text = (
+#     "to_real(@custom_frame_line_width_blu) +"
+#     "to_real(@custom_item_dist_top_blu) + "
+#     "GetDynamicItemHeight(@layout_name,'plan_content_title') + "
+#     "to_real(@custom_dist_title_text_blu) + "
+#     "GetDynamicItemHeight(@layout_name,'plan_content') + "
+#     "to_real(@custom_item_dist_bottom_blu)"
+# )
+# expr_plan_content_frame_height_text_metadata = (
+#     f"GetDynamicItemHeight(@layout_name,'plan_content_frame') + {expr_plan_content_frame_height_text}"
+# )
+expr_plan_content_frame_height_legend = (
+    "GetDynamicItemHeight(@layout_name,'legend_frame') - GetDynamicItemHeight(@layout_name,'metadata_frame')"
 )
+expr_plan_content_frame_height = f"if({expr_plan_content_frame_height_text_metadata} > {expr_legend_frame_height_text}, {expr_plan_content_frame_height_text}, {expr_plan_content_frame_height_legend})"
+
 plan_content_frame.dataDefinedProperties().setProperty(
     QgsLayoutObject.ItemHeight,
     QgsProperty.fromExpression(expr_plan_content_frame_height),
