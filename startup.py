@@ -2,13 +2,10 @@
 Place this Script in 'AppData\Roaming\QGIS\QGIS3' to have the functions available on startup.
 '''
 
-
-from qgis.utils import qgsfunction
-
+from PyQt5.QtGui import QFont, QFontMetricsF
 from qgis.core import *
 from qgis.gui import *
-
-from PyQt5.QtGui import QFontMetricsF
+from qgis.utils import qgsfunction
 
 
 ### Funktionen ###
@@ -115,104 +112,334 @@ def GetPageSizeHeight(LayoutName):
 @qgsfunction(args='auto', group='Custom')
 def CalcLabelHeight(layout_name, item_name, feature, parent, line_spacing=1.0):
     """
-    Berechnet die tatsächliche Höhe eines QTextLabel-Items im Layout.
-    line_spacing = Faktor für Zeilenabstand (z. B. 1.15 für 15% mehr Abstand)
+    Berechnet die benötigte Höhe eines QgsLayoutItemLabel.
+
+    Berücksichtigt:
+    - harte Zeilenumbrüche
+    - automatischen Zeilenumbruch
+    - Data-Defined-Schriftgröße aus QgsTextFormat
+    - Projekt-, Layout- und Layout-Item-Variablen
     """
 
-    manager = QgsProject.instance().layoutManager()
-    layout = manager.layoutByName(layout_name)
+    project = QgsProject.instance()
+    manager = project.layoutManager()
+    layout = manager.layoutByName(str(layout_name))
 
     if not layout:
-        return 0
+        return 0.0
 
-    item = layout.itemById(item_name)
-    if not item or not isinstance(item, QgsLayoutItemLabel):
-        return 0
+    item = layout.itemById(str(item_name))
 
-    # Text, Font und Breite des Labels
+    if not isinstance(item, QgsLayoutItemLabel):
+        return 0.0
+
     text = item.text()
-    font = item.font()
-    width_mm = item.sizeWithUnits().width()
-    if not text.strip():
-        return 0
 
-    # Umrechnung mm - Pixel (96 dpi)
-    width_px = width_mm * 96 / 25.4
+    if not text or not text.strip():
+        return 0.0
+
+    width_mm = item.sizeWithUnits().width()
+
+    if width_mm <= 0:
+        return 0.0
+
+    # ---------------------------------------------------------
+    # Eigenen featurefreien Expression-Kontext erstellen
+    # ---------------------------------------------------------
+
+    context = QgsExpressionContext()
+
+    context.appendScope(
+        QgsExpressionContextUtils.globalScope()
+    )
+
+    context.appendScope(
+        QgsExpressionContextUtils.projectScope(project)
+    )
+
+    context.appendScope(
+        QgsExpressionContextUtils.layoutScope(layout)
+    )
+
+    context.appendScope(
+        QgsExpressionContextUtils.layoutItemScope(item)
+    )
+
+    # ---------------------------------------------------------
+    # Textformat und Basis-Font auslesen
+    # ---------------------------------------------------------
+
+    text_format = item.textFormat()
+    font = text_format.font()
+
+    base_size = text_format.size()
+
+    if base_size <= 0:
+        base_size = font.pointSizeF()
+
+    if base_size <= 0:
+        base_size = 10.0
+
+    evaluated_size = float(base_size)
+
+    # ---------------------------------------------------------
+    # Data-Defined-Schriftgröße auswerten
+    # ---------------------------------------------------------
+
+    properties = text_format.dataDefinedProperties()
+
+    size_property = properties.property(
+        QgsPalLayerSettings.Size
+    )
+
+    if size_property.isActive():
+
+        # Expression selbst auslesen, z. B.:
+        # @font_size_vq
+        size_expression_string = size_property.expressionString()
+
+        if size_expression_string:
+
+            size_expression = QgsExpression(
+                size_expression_string
+            )
+
+            value = size_expression.evaluate(context)
+
+            if (
+                not size_expression.hasParserError()
+                and not size_expression.hasEvalError()
+                and value is not None
+            ):
+                try:
+                    numeric_value = float(value)
+
+                    if numeric_value > 0:
+                        evaluated_size = numeric_value
+
+                except (TypeError, ValueError):
+                    pass
+
+        else:
+            # Falls die Property einen statischen Wert enthält
+            static_value = size_property.staticValue()
+
+            try:
+                numeric_value = float(static_value)
+
+                if numeric_value > 0:
+                    evaluated_size = numeric_value
+
+            except (TypeError, ValueError):
+                pass
+
+    # Die tatsächlich ausgewertete Größe auf den Font übertragen
+    font.setPointSizeF(evaluated_size)
+
+    # ---------------------------------------------------------
+    # Maße berechnen
+    # ---------------------------------------------------------
+
+    width_px = width_mm * 96.0 / 25.4
     metrics = QFontMetricsF(font)
 
     lines = []
+    paragraphs = text.split("\n")
 
-    # Text in Abschnitte trennen (Absatz = Zeilenumbruch)
-    paragraphs = text.split('\n')
+    for paragraph in paragraphs:
 
-    for para in paragraphs:
-
-        # harte Leerzeile - als echte Zeile zaehlen
-        if para.strip() == "":
+        # Explizite Leerzeile
+        if paragraph.strip() == "":
             lines.append(" ")
             continue
 
-        words = para.split(" ")
+        words = paragraph.split(" ")
         current_line = ""
 
         for word in words:
-            test_line = word if current_line == "" else current_line + " " + word
+            if current_line:
+                test_line = current_line + " " + word
+            else:
+                test_line = word
 
-            # boundingRect statt horizontalAdvance
-            if metrics.boundingRect(test_line).width() > width_px:
-                # alte Zeile abschliessen
-                if current_line != "":
+            test_width = metrics.horizontalAdvance(test_line)
+
+            if test_width > width_px:
+
+                if current_line:
                     lines.append(current_line)
                 current_line = word
+
             else:
                 current_line = test_line
 
-        if current_line != "":
+        if current_line:
             lines.append(current_line)
 
-    # Gesamthoehe berechnen
-    total_height_px = 0
+    # ---------------------------------------------------------
+    # Höhe aller Zeilen berechnen
+    # ---------------------------------------------------------
+
+    total_height_px = 0.0
+
     for line in lines:
-        h = metrics.boundingRect(line).height()
-        total_height_px += h * line_spacing
+        line_height_px = metrics.lineSpacing()
 
-    # Sicherheitsabstand
-    total_height_px *= 1.025
+        total_height_px += (
+            line_height_px * line_spacing
+        )
 
-    # zurueck in mm
-    height_mm = total_height_px * 25.4 / 96
-    return height_mm
+    height_mm = total_height_px * 25.4 / 96.0
+
+    return float(height_mm)
 
 
 @qgsfunction(args="auto", group="Custom")
 def CalcLabelWidth(layout_name, item_id, feature, parent):
-    layout = QgsProject.instance().layoutManager().layoutByName(layout_name)
-    if not layout:
-        return 0
+    """
+    Berechnet die benötigte Breite eines QgsLayoutItemLabel.
 
-    item = layout.itemById(item_id)
-    if not item or not isinstance(item, QgsLayoutItemLabel):
-        return 0
+    Berücksichtigt:
+    - harte Zeilenumbrüche
+    - Data-Defined-Schriftgröße aus QgsTextFormat
+    - Projekt-, Layout- und Layout-Item-Variablen
+    """
+
+    project = QgsProject.instance()
+    manager = project.layoutManager()
+    layout = manager.layoutByName(str(layout_name))
+
+    if not layout:
+        return 0.0
+
+    item = layout.itemById(str(item_id))
+
+    if not isinstance(item, QgsLayoutItemLabel):
+        return 0.0
 
     text = item.text()
-    font = item.font()
-    if not text.strip():
-        return 0
+
+    if not text or not text.strip():
+        return 0.0
+
+    # ---------------------------------------------------------
+    # Eigenen featurefreien Expression-Kontext erstellen
+    # ---------------------------------------------------------
+
+    context = QgsExpressionContext()
+
+    context.appendScope(
+        QgsExpressionContextUtils.globalScope()
+    )
+
+    context.appendScope(
+        QgsExpressionContextUtils.projectScope(project)
+    )
+
+    context.appendScope(
+        QgsExpressionContextUtils.layoutScope(layout)
+    )
+
+    context.appendScope(
+        QgsExpressionContextUtils.layoutItemScope(item)
+    )
+
+    # ---------------------------------------------------------
+    # Textformat und Basis-Font auslesen
+    # ---------------------------------------------------------
+
+    text_format = item.textFormat()
+    font = text_format.font()
+
+    base_size = text_format.size()
+
+    if base_size <= 0:
+        base_size = font.pointSizeF()
+
+    if base_size <= 0:
+        base_size = 10.0
+
+    evaluated_size = float(base_size)
+
+    # ---------------------------------------------------------
+    # Data-Defined-Schriftgröße auswerten
+    # ---------------------------------------------------------
+
+    properties = text_format.dataDefinedProperties()
+
+    size_property = properties.property(
+        QgsPalLayerSettings.Size
+    )
+
+    if size_property.isActive():
+
+        # Expression auslesen, beispielsweise:
+        # @custom_font_size_blu
+        size_expression_string = size_property.expressionString()
+
+        if size_expression_string:
+
+            size_expression = QgsExpression(
+                size_expression_string
+            )
+
+            value = size_expression.evaluate(context)
+
+            if (
+                not size_expression.hasParserError()
+                and not size_expression.hasEvalError()
+                and value is not None
+            ):
+                try:
+                    numeric_value = float(value)
+
+                    if numeric_value > 0:
+                        evaluated_size = numeric_value
+
+                except (TypeError, ValueError):
+                    pass
+
+        else:
+            # Falls die Property einen statischen Wert enthält
+            static_value = size_property.staticValue()
+
+            try:
+                numeric_value = float(static_value)
+
+                if numeric_value > 0:
+                    evaluated_size = numeric_value
+
+            except (TypeError, ValueError):
+                pass
+
+    # Tatsächlich ausgewertete Schriftgröße übernehmen
+    font.setPointSizeF(evaluated_size)
+
+    # ---------------------------------------------------------
+    # Breite berechnen
+    # ---------------------------------------------------------
 
     font_metrics = QFontMetricsF(font)
-    # get max line width in pixels
-    widths_px = [font_metrics.horizontalAdvance(line) for line in text.split("\n")]
-    max_width_px = max(widths_px) if widths_px else 0
 
-    # add 5% padding
+    widths_px = [
+        font_metrics.horizontalAdvance(line)
+        for line in text.split("\n")
+    ]
+
+    max_width_px = max(widths_px) if widths_px else 0.0
+
+    # add 5% padding 
     max_width_px *= 1.04
 
     # convert px back to mm (96 dpi assumption)
-    width_mm = max_width_px * 25.4 / 96
+    width_mm = max_width_px * 25.4 / 96.0
 
-    return width_mm
+    return float(width_mm)
 
 
+# ##########################################################
+# Register functions to be able to use them in QGIS
+# ##########################################################
 functions_to_load = (GetDynamicItemHeight, GetDynamicItemWidth, GetDynamicItemPositionX,
                      GetDynamicItemPositionY, GetPageSizeWidth, GetPageSizeHeight,
                      CalcLabelHeight, CalcLabelWidth)
@@ -223,3 +450,35 @@ def registerFunction(isRegister=True):
         QgsExpression.registerFunction(f)    
 
 registerFunction()
+
+
+# ##########################################################
+# Add helper functions for layout creation
+# ##########################################################
+def create_text_format(
+    font_family,
+    variable_name,
+    bold=False
+):
+    """
+    # Add helper functions for layout creation
+    """
+    # Properties that can be set: listed in API Doku section Property of 'Class: QgsPalLayerSettings'
+    fmt = QgsTextFormat()
+
+    fmt.setFont(
+        QFont(
+            font_family,
+            -1,
+            QFont.Bold if bold else QFont.Normal
+        )
+    )
+
+    fmt.dataDefinedProperties().setProperty(
+        QgsPalLayerSettings.Size,
+        QgsProperty.fromExpression(
+            f"@{variable_name}"
+        )
+    )
+
+    return fmt
