@@ -1,3 +1,5 @@
+from startup import create_text_format
+
 ### Variablen ###
 # Seitengrößen
 custom_page_size_width_blu = 169.03  # mm
@@ -22,9 +24,8 @@ custom_frame_width_blu = 40
 # Größe Nordpfeil
 custom_north_arrow_width_blu = 5
 custom_north_arrow_height_blu = 8
-# Größe Maßstab
-custom_scale_width_blu = 35
-custom_scale_height_blu = 9
+# Größe logos
+custom_endura_logo_width_blu = 9.5
 # Font
 font = "Calibri"
 font_size = 10
@@ -42,15 +43,14 @@ custom_scale_segment_length = 100  #                Länge der Segmente in der B
 custom_scale_label_space_blu = 2
 custom_scale_bar_height_blu = 2
 # Pfade
-svg_path_north_arrow = r"C:\PATH\TO\NorthArrow.svg"
+svg_path_north_arrow = r"PATH\TO\NorthArrow.svg"
 svg_path_municipality_logo = r"PATH\TO\LOGO.svg"
-jpg_path_endura_logo = r"PATH\TO\LOGO.svg"
+jpg_path_endura_logo = r"PATH\TO\LOGO.jpeg"
 
 
 #################################################################
 ### Custom Variablen für Print Layout setzen
-QgsProject.instance().setCustomVariables(
-    {
+custom_variables = {
         "custom_page_dist_left_blu": str(custom_page_dist_left_blu),
         "custom_page_dist_right_blu": str(custom_page_dist_right_blu),
         "custom_page_dist_top_blu": str(custom_page_dist_top_blu),
@@ -64,20 +64,29 @@ QgsProject.instance().setCustomVariables(
         "custom_frame_width_blu": str(custom_frame_width_blu),
         "custom_north_arrow_width_blu": str(custom_north_arrow_width_blu),
         "custom_north_arrow_height_blu": str(custom_north_arrow_height_blu),
-        "custom_scale_width_blu": str(custom_scale_width_blu),
-        "custom_scale_height_blu": str(custom_scale_height_blu),
         "custom_scale_label_space_blu": str(custom_scale_label_space_blu),
         "custom_scale_bar_height_blu": str(custom_scale_bar_height_blu),
         "custom_page_size_width_blu": str(custom_page_size_width_blu),
         #"custom_page_size_height_blu": str(custom_page_size_height_blu),
         "custom_map_height_blu": str(custom_map_height_blu),
+        "custom_font_size_blu": str(font_size),
+        "custom_font_size_title_blu": str(font_size_title),
+        "custom_font_size_metadata_blu": str(font_size_metadata),
+        "custom_font_family_blu": font,
+        "custom_endura_logo_width_blu": str(custom_endura_logo_width_blu),
     }
-)
 
 #################################################################
 
 # Get the current QGIS project instance
 project = QgsProject.instance()
+
+for key, value in custom_variables.items():
+    QgsExpressionContextUtils.setProjectVariable(
+        project,
+        key,
+        value
+    )
 
 # Access the layout manager
 layout_manager = project.layoutManager()
@@ -119,7 +128,7 @@ page.dataDefinedProperties().setProperty(
 ### Map ###
 map = QgsLayoutItemMap(new_layout)
 map.setId("map")
-map.setFrameEnabled(True)
+map.setFrameEnabled(False)
 map.setFrameStrokeWidth(QgsLayoutMeasurement(custom_frame_line_width_blu))
 map.dataDefinedProperties().setProperty(
     QgsLayoutObject.PositionX, QgsProperty.fromExpression("@custom_frame_line_width_blu/2")
@@ -144,13 +153,71 @@ map.setExtent(canvas_extent)
 new_layout.addLayoutItem(map)
 
 
+### map frame ###
+
+map_frame = QgsLayoutItemShape(new_layout)
+map_frame.setShapeType(QgsLayoutItemShape.Rectangle)
+map_frame.setId("map_frame")
+
+symbol = map_frame.symbol()
+layer = symbol.symbolLayer(0)
+layer.setFillColor(Qt.transparent)
+layer.dataDefinedProperties().setProperty(
+    QgsSymbolLayer.PropertyStrokeWidth,
+    QgsProperty.fromExpression(
+        "@custom_frame_line_width_blu"
+    )
+)
+
+map_frame.setSymbol(symbol)
+
+map_frame.dataDefinedProperties().setProperty(
+    QgsLayoutObject.PositionX,
+    QgsProperty.fromExpression(
+        "GetDynamicItemPositionX(@layout_name,'map')"
+    )
+)
+
+map_frame.dataDefinedProperties().setProperty(
+    QgsLayoutObject.PositionY,
+    QgsProperty.fromExpression(
+        "GetDynamicItemPositionY(@layout_name,'map')"
+    )
+)
+
+map_frame.dataDefinedProperties().setProperty(
+    QgsLayoutObject.ItemWidth,
+    QgsProperty.fromExpression(
+        "GetDynamicItemWidth(@layout_name,'map')"
+    )
+)
+
+map_frame.dataDefinedProperties().setProperty(
+    QgsLayoutObject.ItemHeight,
+    QgsProperty.fromExpression(
+        "GetDynamicItemHeight(@layout_name,'map')"
+    )
+)
+
+new_layout.addLayoutItem(map_frame)
+
+
 ### Legend Frame ###
 
 legend_frame = QgsLayoutItemShape(new_layout)
 legend_frame.setShapeType(QgsLayoutItemShape.Rectangle)
 legend_frame.setId("legend_frame")
-legend_frame.setFrameEnabled(True)
-legend_frame.setFrameStrokeWidth(QgsLayoutMeasurement(custom_frame_line_width_blu))
+
+symbol = legend_frame.symbol()
+layer = symbol.symbolLayer(0)
+layer.dataDefinedProperties().setProperty(
+    QgsSymbolLayer.PropertyStrokeWidth,
+    QgsProperty.fromExpression(
+    "@custom_frame_line_width_blu"
+    )
+)
+legend_frame.setSymbol(symbol)
+
 legend_frame.dataDefinedProperties().setProperty(
     QgsLayoutObject.PositionX, QgsProperty.fromExpression("@custom_frame_line_width_blu/2")
 )
@@ -233,7 +300,9 @@ legend_title.dataDefinedProperties().setProperty(
         "to_real(@custom_item_dist_left_blu)"
     ),
 )
-legend_title.setFont(QFont(font, font_size_title, QFont.Bold))
+legend_title.setTextFormat(
+    create_text_format(font, "custom_font_size_title_blu", bold=True)
+)
 legend_title.setMargin(0)
 legend_title.dataDefinedProperties().setProperty(
     QgsLayoutObject.ItemHeight,
@@ -253,9 +322,35 @@ legend.setResizeToContents(True)
 legend.setLinkedMap(map)
 legend.setWrapString('//')
 
-legend.setStyleFont(QgsLegendStyle.Group, QFont(font, font_size))
-legend.setStyleFont(QgsLegendStyle.Subgroup, QFont(font, font_size))
-legend.setStyleFont(QgsLegendStyle.SymbolLabel, QFont(font, font_size))
+legend.setLinkedMap(map)
+legend.setWrapString("//")
+
+legend.rstyle(
+    QgsLegendStyle.Group
+).setTextFormat(
+    create_text_format(
+        font,
+        "custom_font_size_blu"
+    )
+)
+
+legend.rstyle(
+    QgsLegendStyle.Subgroup
+).setTextFormat(
+    create_text_format(
+        font,
+        "custom_font_size_blu"
+    )
+)
+
+legend.rstyle(
+    QgsLegendStyle.SymbolLabel
+).setTextFormat(
+    create_text_format(
+        font,
+        "custom_font_size_blu"
+    )
+)
 
 legend.setSymbolWidth(legend_symbol_width)
 legend.setSymbolHeight(legend_symbol_height)
@@ -281,7 +376,7 @@ for style in styles:
     legend.rstyle(style).setMargin(0)
 
 legend.setBoxSpace(0)
-legend.setColumnSpace(custom_item_dist_left_blu)
+legend.setColumnSpace(custom_item_dist_left_blu * 2)
 
 legend.rstyle(QgsLegendStyle.Symbol).setMargin(
     QgsLegendStyle.Left, legend_symbol_spacing_left
@@ -367,8 +462,17 @@ new_layout.addLayoutItem(column_width_indicator)
 plan_content_frame = QgsLayoutItemShape(new_layout)
 plan_content_frame.setShapeType(QgsLayoutItemShape.Rectangle)
 plan_content_frame.setId("plan_content_frame")
-plan_content_frame.setFrameEnabled(True)
-plan_content_frame.setFrameStrokeWidth(QgsLayoutMeasurement(custom_frame_line_width_blu))
+
+symbol = plan_content_frame.symbol()
+layer = symbol.symbolLayer(0)
+layer.dataDefinedProperties().setProperty(
+    QgsSymbolLayer.PropertyStrokeWidth,
+    QgsProperty.fromExpression(
+    "@custom_frame_line_width_blu"
+    )
+)
+plan_content_frame.setSymbol(symbol)
+
 plan_content_frame.dataDefinedProperties().setProperty(
     QgsLayoutObject.PositionX,
     QgsProperty.fromExpression(
@@ -441,7 +545,9 @@ plan_content_title.dataDefinedProperties().setProperty(
         "to_real(@custom_item_dist_left_blu)"
     ),
 )
-plan_content_title.setFont(QFont(font, font_size_title, QFont.Bold))
+plan_content_title.setTextFormat(
+    create_text_format(font, "custom_font_size_title_blu", bold=True)
+)
 plan_content_title.setMargin(0)
 plan_content_title.dataDefinedProperties().setProperty(
     QgsLayoutObject.ItemHeight,
@@ -478,7 +584,9 @@ plan_content.dataDefinedProperties().setProperty(
         "to_real(@custom_item_dist_left_blu)"
     ),
 )
-plan_content.setFont(QFont(font, font_size))
+plan_content.setTextFormat(
+    create_text_format(font, "custom_font_size_blu")
+)
 plan_content.setMargin(0)
 plan_content.dataDefinedProperties().setProperty(
     QgsLayoutObject.ItemHeight,
@@ -492,8 +600,17 @@ new_layout.addLayoutItem(plan_content)
 metadata_frame = QgsLayoutItemShape(new_layout)
 metadata_frame.setShapeType(QgsLayoutItemShape.Rectangle)
 metadata_frame.setId("metadata_frame")
-metadata_frame.setFrameEnabled(True)
-metadata_frame.setFrameStrokeWidth(QgsLayoutMeasurement(custom_frame_line_width_blu))
+
+symbol = metadata_frame.symbol()
+layer = symbol.symbolLayer(0)
+layer.dataDefinedProperties().setProperty(
+    QgsSymbolLayer.PropertyStrokeWidth,
+    QgsProperty.fromExpression(
+    "@custom_frame_line_width_blu"
+    )
+)
+metadata_frame.setSymbol(symbol)
+
 metadata_frame.dataDefinedProperties().setProperty(
     QgsLayoutObject.PositionX,
     QgsProperty.fromExpression(
@@ -533,7 +650,9 @@ metadata.setText(
     + "Sonstige Karteninhalte: \n"
     + "eigene Darstellung"
 )
-metadata.setFont(QFont(font, font_size_metadata))
+metadata.setTextFormat(
+    create_text_format(font, "custom_font_size_metadata_blu")
+)
 metadata.setMargin(0)
 metadata.setId("metadata")
 metadata.dataDefinedProperties().setProperty(
@@ -570,9 +689,9 @@ new_layout.addLayoutItem(metadata)
 ### North Arrow ###
 north_arrow = QgsLayoutItemPicture(new_layout)
 north_arrow.setId("north_arrow")
-north_arrow.setFrameEnabled(False)
 
 north_arrow.setPicturePath(svg_path_north_arrow)
+north_arrow.setMode(QgsLayoutItemPicture.FormatSVG)
 
 north_arrow.dataDefinedProperties().setProperty(
     QgsLayoutObject.PositionX,
@@ -601,14 +720,23 @@ new_layout.addLayoutItem(north_arrow)
 ### Scale Bar ###
 scale_bar = QgsLayoutItemScaleBar(new_layout)
 scale_bar.setId("scale_bar")
-scale_bar.setFrameEnabled(False)
 
 scale_bar.setStyle("Single Box")
 scale_bar.setBoxContentSpace(0)
-scale_bar.setFont(QFont(font, font_size_metadata))
+scale_bar.setTextFormat(
+    create_text_format(
+        font,
+        "custom_font_size_metadata_blu"
+    )
+)
 scale_bar.setLabelBarSpace(custom_scale_label_space_blu)
 scale_bar.setLinkedMap(map)
-scale_bar.setHeight(custom_scale_bar_height_blu)
+scale_bar.dataDefinedProperties().setProperty(
+    QgsLayoutObject.ScalebarHeight,
+    QgsProperty.fromExpression(
+        "@custom_scale_bar_height_blu"
+    )
+)
 
 
 scale_bar.setReferencePoint(QgsLayoutItem.LowerLeft)
@@ -628,7 +756,9 @@ scale_bar.dataDefinedProperties().setProperty(
 scale_bar.dataDefinedProperties().setProperty(
     QgsLayoutObject.ItemHeight,
     QgsProperty.fromExpression(
-        f"to_real(@custom_scale_bar_height_blu) + to_real(@custom_scale_label_space_blu) + {int(font_size_metadata)}*0.352778"
+        "to_real(@custom_scale_bar_height_blu) + "
+        "to_real(@custom_scale_label_space_blu) + "
+        "to_real(@custom_font_size_metadata_blu) * 0.352778"
     ),
 )
 
@@ -648,6 +778,7 @@ municipality_box = QgsLayoutItemShape(new_layout)
 municipality_box.setShapeType(QgsLayoutItemShape.Rectangle)
 municipality_box.setId("municipality_box")
 municipality_box.setBackgroundEnabled(False)
+
 municipality_box.setSymbol(
     QgsFillSymbol.createSimple(
         {
@@ -657,7 +788,17 @@ municipality_box.setSymbol(
         }
     )
 )
-municipality_box.setFrameEnabled(False)
+
+symbol = municipality_box.symbol()
+layer = symbol.symbolLayer(0)
+layer.dataDefinedProperties().setProperty(
+    QgsSymbolLayer.PropertyStrokeWidth,
+    QgsProperty.fromExpression(
+    "@custom_frame_line_width_blu"
+    )
+)
+municipality_box.setSymbol(symbol)
+
 
 municipality_box.dataDefinedProperties().setProperty(
     QgsLayoutObject.PositionX,
@@ -682,7 +823,6 @@ new_layout.addLayoutItem(municipality_box)
 ### Municipality Logo ###
 municipality_logo = QgsLayoutItemPicture(new_layout)
 municipality_logo.setId("municipality_logo")
-municipality_logo.setFrameEnabled(False)
 
 municipality_logo.setPicturePath(svg_path_municipality_logo)
 
@@ -699,10 +839,10 @@ municipality_logo.dataDefinedProperties().setProperty(
     ),
 )
 municipality_logo.dataDefinedProperties().setProperty(
-    QgsLayoutObject.ItemWidth, QgsProperty.fromExpression("9.5")
+    QgsLayoutObject.ItemWidth, QgsProperty.fromExpression("@custom_endura_logo_width_blu")
 )
 municipality_logo.dataDefinedProperties().setProperty(
-    QgsLayoutObject.ItemHeight, QgsProperty.fromExpression("10.256")
+    QgsLayoutObject.ItemHeight, QgsProperty.fromExpression("@custom_endura_logo_width_blu / 0.9231")
 )
 
 new_layout.addLayoutItem(municipality_logo)
@@ -711,9 +851,10 @@ new_layout.addLayoutItem(municipality_logo)
 ### Municipality Label ###
 municipality_label = QgsLayoutItemLabel(new_layout)
 municipality_label.setId("municipality_label")
-municipality_label.setFrameEnabled(False)
 municipality_label.setText("Gemeinde/Stadt\nXX")
-municipality_label.setFont(QFont(font, font_size))
+municipality_label.setTextFormat(
+    create_text_format(font, "custom_font_size_blu")
+)
 municipality_label.setMargin(0)
 
 municipality_label.dataDefinedProperties().setProperty(
