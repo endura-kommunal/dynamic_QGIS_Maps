@@ -1,5 +1,5 @@
 # Dynamic QGIS Map Layouts
-Scripts to create dynamically adapting Map Layouts in QGIS. Refering to talk "Arbeit mit standardisierten Karten - Dynamische Kartenerstellung mit PyQGIS" at FOSSGIS-Konferenz 2026.
+Scripts to create dynamically adapting Map Layouts in QGIS. Refering to talk ["Arbeit mit standardisierten Karten - Dynamische Kartenerstellung mit PyQGIS"](https://media.ccc.de/v/fossgis2026-84267-arbeit-mit-standardisierten-karten-dynamische-kartenerstellung-mit-pyqgis) at FOSSGIS-Konferenz 2026.
 
 ## Usage
 1. Place startup.py script in QGIS' Python home directory:
@@ -11,8 +11,12 @@ Scripts to create dynamically adapting Map Layouts in QGIS. Refering to talk "Ar
 
 3. Open Layout in QGIS GUI, and: 
     - Click "Refresh view (F5)" a few times, until Layout is not changing anymore
-    - If the map is not rendering, click "Set Map Extent to Match Main Canvas Extent" to inizialize rendering
     - Adapt scale bar size manually
+
+4. To change Layout Parameters: 
+    - Go to "Project" -> "Properties" -> "Variables"
+    - Adjust Parameter in the "Project" Section to your liking
+    - Click "Apply", go to Layout and click "Refresh view (F5)" a few times, until Layout is not changing anymore
 
 
 ## Known Limitations
