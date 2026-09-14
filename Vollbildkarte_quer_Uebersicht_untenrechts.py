@@ -979,7 +979,7 @@ endura_logo.dataDefinedProperties().setProperty(
     QgsLayoutObject.ItemWidth, QgsProperty.fromExpression("@custom_endura_logo_width_vquu")
 )
 endura_logo.dataDefinedProperties().setProperty(
-    QgsLayoutObject.ItemHeight, QgsProperty.fromExpression("@custom_endura_logo_width_vq / 2")
+    QgsLayoutObject.ItemHeight, QgsProperty.fromExpression("@custom_endura_logo_width_vquu/ 2")
 )
 
 new_layout.addLayoutItem(endura_logo)
@@ -1116,7 +1116,7 @@ municipality_logo.dataDefinedProperties().setProperty(
     QgsLayoutObject.ItemWidth, QgsProperty.fromExpression("@custom_endura_logo_width_vquu")
 )
 municipality_logo.dataDefinedProperties().setProperty(
-    QgsLayoutObject.ItemHeight, QgsProperty.fromExpression("@custom_endura_logo_width_vq / 0.9231")
+    QgsLayoutObject.ItemHeight, QgsProperty.fromExpression("@custom_endura_logo_width_vquu/ 0.9231")
 )
 
 new_layout.addLayoutItem(municipality_logo)
