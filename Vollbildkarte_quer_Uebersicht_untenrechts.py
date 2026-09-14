@@ -162,7 +162,7 @@ map_frame.setId("map_frame")
 
 symbol = map_frame.symbol()
 layer = symbol.symbolLayer(0)
-layer.setFillColor(Qt.transparent)
+layer.setFillColor(QColor(0, 0, 0, 0))
 layer.dataDefinedProperties().setProperty(
     QgsSymbolLayer.PropertyStrokeWidth,
     QgsProperty.fromExpression(
@@ -251,7 +251,7 @@ map_frame_overview.setId("map_frame_overview")
 
 symbol = map_frame_overview.symbol()
 layer = symbol.symbolLayer(0)
-layer.setFillColor(Qt.transparent)
+layer.setFillColor(QColor(0, 0, 0, 0))
 layer.dataDefinedProperties().setProperty(
     QgsSymbolLayer.PropertyStrokeWidth,
     QgsProperty.fromExpression(
@@ -825,7 +825,7 @@ north_arrow.dataDefinedProperties().setProperty(
     QgsLayoutObject.ItemHeight, QgsProperty.fromExpression("@custom_north_arrow_height_vquu")
 )
 north_arrow.setLinkedMap(map)
-north_arrow.setNorthMode(0)
+north_arrow.setNorthMode(QgsLayoutItemPicture.NorthMode.GridNorth)
 
 new_layout.addLayoutItem(north_arrow)
 
